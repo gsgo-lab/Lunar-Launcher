@@ -1,3 +1,4 @@
+# Lunar build workflow
 name: Build Lunar Launcher
 
 on:
