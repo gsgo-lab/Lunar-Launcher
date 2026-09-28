@@ -1,0 +1,16 @@
+name: Lunar Manual Build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Test
+        run: |
+          echo "Lunar workflow_dispatch works"
+          echo "Commit: $GITHUB_SHA"
