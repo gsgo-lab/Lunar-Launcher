@@ -1,16 +1,53 @@
-name: Lunar Manual Build
+name: Lunar Launcher ARM64 Build
 
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
-  test:
+  build:
     runs-on: ubuntu-22.04
+
     steps:
-      - name: Checkout
+      - name: Checkout Lunar
         uses: actions/checkout@v4
 
-      - name: Test
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK
         run: |
-          echo "Lunar workflow_dispatch works"
-          echo "Commit: $GITHUB_SHA"
+          sdkmanager --install \
+            "platforms;android-35" \
+            "build-tools;35.0.0" \
+            "ndk;27.0.12077973" \
+            "cmake;3.22.1"
+
+      - name: Build Lunar APK
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleDebug --no-daemon --stacktrace
+
+      - name: Collect APK
+        run: |
+          set -e
+          APK=$(find app/build/outputs/apk/debug -type f -name '*.apk' | head -1)
+          test -n "$APK"
+          mkdir -p out
+          cp "$APK" out/Lunar-Launcher-1.0-debug-arm64.apk
+          sha256sum out/Lunar-Launcher-1.0-debug-arm64.apk > out/SHA256SUMS.txt
+          ls -lh out/
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Lunar-Launcher-1.0-debug-arm64
+          path: out/*
