@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "name": "survival",
+  "description": "Комфортное выживание",
+  "inherits": "default.json"
+}

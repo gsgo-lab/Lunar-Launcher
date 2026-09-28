@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "name": "pvp",
+  "description": "Быстрое PvP управление",
+  "inherits": "default.json",
+  "keyboard": {
+    "sprint": "LEFT_CTRL",
+    "drop": "Q"
+  }
+}

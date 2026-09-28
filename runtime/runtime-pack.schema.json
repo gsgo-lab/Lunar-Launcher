@@ -1,0 +1,9 @@
+{
+  "format": 2,
+  "launcher": "lunar",
+  "javaMajor": 21,
+  "abis": ["arm64-v8a"],
+  "requires": ["bin/java", "lib/libjvm.so", "lib/libjli.so"],
+  "source": "github-actions-runtime",
+  "install": "assets/runtime/arm64"
+}

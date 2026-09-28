@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "name": "touch",
+  "description": "Сенсорный профиль",
+  "inherits": "default.json",
+  "touch": {
+    "layout": "classic",
+    "joystick": true,
+    "buttons": [
+      "jump",
+      "attack",
+      "use",
+      "inventory",
+      "sneak"
+    ]
+  }
+}

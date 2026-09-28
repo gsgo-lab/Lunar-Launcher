@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "name": "Lunar Core",
+  "abi": [
+    "arm64-v8a"
+  ],
+  "graphics": {
+    "default": "gles3",
+    "backends": [
+      "gles3",
+      "gl4es",
+      "angle",
+      "zink"
+    ],
+    "requiresNativeLibraries": true
+  },
+  "input": {
+    "surface": "android",
+    "touch": true,
+    "mouse": true,
+    "keyboard": true
+  },
+  "jvmArgs": [],
+  "env": {}
+}

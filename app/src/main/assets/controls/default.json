@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "name": "default",
+  "description": "Первоначальное стандартное управление",
+  "keyboard": {
+    "forward": "W",
+    "back": "S",
+    "left": "A",
+    "right": "D",
+    "jump": "SPACE",
+    "sprint": "LEFT_SHIFT",
+    "inventory": "E",
+    "drop": "Q",
+    "attack": "MOUSE_LEFT",
+    "use": "MOUSE_RIGHT",
+    "pick_block": "MOUSE_MIDDLE",
+    "slot_1": "1",
+    "slot_2": "2",
+    "slot_3": "3",
+    "slot_4": "4",
+    "slot_5": "5",
+    "slot_6": "6",
+    "slot_7": "7",
+    "slot_8": "8",
+    "slot_9": "9"
+  },
+  "mouse": {
+    "sensitivity": 0.5,
+    "invert_y": false
+  }
+}

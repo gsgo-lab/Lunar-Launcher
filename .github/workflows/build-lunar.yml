@@ -1,0 +1,148 @@
+name: Build Lunar Launcher
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, master ]
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  UPSTREAM_BRANCH: v3_openjdk
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout Lunar
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK/NDK/CMake
+        run: |
+          sdkmanager --install \
+            "platforms;android-35" \
+            "build-tools;35.0.0" \
+            "ndk;27.0.12077973" \
+            "cmake;3.22.1"
+
+      - name: Download real Android OpenJDK 21 ARM64
+        uses: dawidd6/action-download-artifact@v9
+        with:
+          workflow: build.yml
+          workflow_conclusion: success
+          repo: PojavLauncherTeam/android-openjdk-build-multiarch
+          branch: buildjre17-21
+          name: jre21-pojav
+          path: runtime/download
+
+      - name: Unpack and select ARM64 JRE only
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf app/src/main/assets/runtime/arm64 runtime/unpacked
+          mkdir -p app/src/main/assets/runtime/arm64 runtime/unpacked
+          shopt -s nullglob
+          for f in runtime/download/**/*.tar.xz runtime/download/*.tar.xz; do
+            tar -xJf "$f" -C runtime/unpacked
+          done
+          for f in runtime/download/**/*.zip runtime/download/*.zip; do
+            unzip -q "$f" -d runtime/unpacked
+          done
+          JRE=$(find runtime/unpacked -type f -path '*/bin/java' | grep -E '/(aarch64|arm64|linux-aarch64|linux-arm64)/|/jre[^/]*/bin/java|/bin/java$' | head -1 || true)
+          if [[ -z "$JRE" ]]; then
+            JRE=$(find runtime/unpacked -type f -name java | head -1 || true)
+          fi
+          test -n "$JRE"
+          ROOT=${JRE%/bin/java}
+          test -f "$ROOT/lib/libjli.so" || test -f "$ROOT/lib/jli/libjli.so" || test -f "$ROOT/jre/lib/aarch64/jli/libjli.so"
+          cp -a "$ROOT/." app/src/main/assets/runtime/arm64/
+          test -f app/src/main/assets/runtime/arm64/bin/java
+          test -f app/src/main/assets/runtime/arm64/lib/libjli.so || find app/src/main/assets/runtime/arm64 -name libjli.so -print -quit | grep -q .
+          chmod +x app/src/main/assets/runtime/arm64/bin/java
+          du -sh app/src/main/assets/runtime/arm64
+
+      - name: Checkout native Android game runtime source
+        uses: actions/checkout@v4
+        with:
+          repository: PojavLauncherTeam/PojavLauncher
+          ref: ${{ env.UPSTREAM_BRANCH }}
+          path: runtime/native-source
+          submodules: recursive
+
+      - name: Build Android GLFW compatibility classes
+        working-directory: runtime/native-source
+        run: |
+          chmod +x gradlew
+          ./gradlew :jre_lwjgl3glfw:build --no-daemon
+          mkdir -p "$GITHUB_WORKSPACE/app/src/main/assets/components/lwjgl"
+          cp jre_lwjgl3glfw/build/libs/*.jar "$GITHUB_WORKSPACE/app/src/main/assets/components/lwjgl/lwjgl-glfw-classes.jar"
+
+      - name: Build native Android runtime libraries
+        working-directory: runtime/native-source
+        run: |
+          ./gradlew :app_pojavlauncher:assembleDebug --no-daemon
+          APK=$(find app_pojavlauncher/build/outputs/apk/debug -name '*.apk' | head -1)
+          test -n "$APK"
+          rm -rf "$GITHUB_WORKSPACE/app/src/main/jniLibs/arm64-v8a"
+          mkdir -p "$GITHUB_WORKSPACE/app/src/main/jniLibs/arm64-v8a"
+          unzip -j "$APK" 'lib/arm64-v8a/*.so' -d "$GITHUB_WORKSPACE/app/src/main/jniLibs/arm64-v8a"
+          test -n "$(find "$GITHUB_WORKSPACE/app/src/main/jniLibs/arm64-v8a" -type f -name '*.so' -print -quit)"
+          ls -lh "$GITHUB_WORKSPACE/app/src/main/jniLibs/arm64-v8a"
+
+      - name: Copy required license texts
+        run: |
+          cp runtime/native-source/LICENSE THIRD_PARTY_NOTICES_UPSTREAM.txt
+          cat >> THIRD_PARTY_NOTICES.md <<'EOF'
+
+Runtime/native components are produced from the upstream open-source Android runtime build used by this CI. Their applicable license texts are retained in THIRD_PARTY_NOTICES_UPSTREAM.txt.
+EOF
+
+      - name: Validate real runtime before APK build
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -x app/src/main/assets/runtime/arm64/bin/java
+          find app/src/main/assets/runtime/arm64 -name libjli.so -print -quit | grep -q .
+          find app/src/main/assets/runtime/arm64 -name libjvm.so -print -quit | grep -q .
+          test -s app/src/main/assets/components/lwjgl/lwjgl-glfw-classes.jar
+          test -n "$(find app/src/main/jniLibs/arm64-v8a -name '*.so' -print -quit)"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11'
+
+      - name: Build Lunar APK
+        run: gradle :app:assembleDebug --no-daemon
+
+      - name: Verify final APK really contains Java + native runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=$(find app/build/outputs/apk/debug -name '*.apk' | head -1)
+          test -n "$APK"
+          unzip -l "$APK" | grep -q 'assets/runtime/arm64/bin/java'
+          unzip -l "$APK" | grep -q 'assets/runtime/arm64'
+          unzip -l "$APK" | grep -q 'assets/components/lwjgl/lwjgl-glfw-classes.jar'
+          unzip -l "$APK" | grep -E -q 'lib/arm64-v8a/.*\.so'
+          mkdir -p out
+          cp "$APK" out/Lunar-Launcher-1.0-debug-arm64.apk
+          sha256sum out/Lunar-Launcher-1.0-debug-arm64.apk | tee out/SHA256SUMS.txt
+          ls -lh out/Lunar-Launcher-1.0-debug-arm64.apk
+
+      - name: Upload ready APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Lunar-Launcher-1.0-ready-arm64
+          path: out/*
